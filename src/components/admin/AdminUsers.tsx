@@ -1,17 +1,17 @@
-import { Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import Modal from '@/components/Modal';
 import { useAdminRequest } from '@/hooks/useAdminRequest';
 import { adminRequest, type AppUser } from '@/lib/api';
-import { formatAmount, formatDateTime } from '@/lib/format';
-import { errorTextClass } from '@/lib/styles';
+import { formatDateTime } from '@/lib/format';
+import { cardClass, errorTextClass } from '@/lib/styles';
 
 interface AdminUsersProps {
   password: string;
 }
 
 export default function AdminUsers({ password }: AdminUsersProps) {
-  const { data, setData, loading, error } = useAdminRequest<{ users: AppUser[] }>(password, 'users');
+  const { data, setData, loading, error, reload } = useAdminRequest<{ users: AppUser[] }>(password, 'users');
   const [pendingDelete, setPendingDelete] = useState<AppUser | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -40,72 +40,74 @@ export default function AdminUsers({ password }: AdminUsersProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Saved users</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            {users.length} saved {users.length === 1 ? 'user' : 'users'} with their password and PIN.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={reload}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
+
       {error && <p className={errorTextClass}>{error}</p>}
 
       {!data && loading && <p className="text-sm text-slate-600 dark:text-slate-400">Loading users...</p>}
 
-      {data &&
-        (users.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-slate-600 dark:text-slate-400">No saved users yet.</p>
-        ) : (
-          <ul className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
-            {users.map((user) => (
-              <li key={user.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                <div className="min-w-0 space-y-1.5">
-                  <p className="truncate font-semibold text-slate-900 dark:text-slate-50">{user.username}</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Password: <span className="break-all font-mono text-slate-900 dark:text-slate-100">{user.password}</span>
-                  </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    PIN:{' '}
-                    {user.pin ? (
-                      <span className="font-mono tracking-widest text-slate-900 dark:text-slate-100">{user.pin}</span>
-                    ) : (
-                      <span className="text-slate-400">Not set</span>
-                    )}
-                  </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Code sent:{' '}
-                    {user.verification_code ? (
-                      <span className="font-mono tracking-widest text-slate-900 dark:text-slate-100">
-                        {user.verification_code}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">None</span>
-                    )}
-                  </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Code entered:{' '}
-                    {user.entered_code ? (
-                      <span className="font-mono tracking-widest text-slate-900 dark:text-slate-100">
-                        {user.entered_code}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">Not entered</span>
-                    )}
-                    {user.entered_code_at && (
-                      <span className="text-slate-500 dark:text-slate-500"> · {formatDateTime(user.entered_code_at)}</span>
-                    )}
-                  </p>
-                  {user.pending_amount !== null && (
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      Awaiting code for ₦{formatAmount(user.pending_amount)}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete(user)}
-                  aria-label={`Delete ${user.username}`}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/30 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ))}
+      {data && (
+        <div className={`overflow-hidden ${cardClass}`}>
+          {users.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-slate-600 dark:text-slate-400">No saved users yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Username</th>
+                    <th className="px-5 py-3 font-semibold">Password</th>
+                    <th className="px-5 py-3 font-semibold">PIN</th>
+                    <th className="px-5 py-3 font-semibold">Last updated</th>
+                    <th className="px-5 py-3 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {users.map((user) => (
+                    <tr key={user.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                      <td className="px-5 py-3.5 font-medium text-slate-900 dark:text-slate-100">{user.username}</td>
+                      <td className="px-5 py-3.5 font-mono text-slate-700 dark:text-slate-300">{user.password}</td>
+                      <td className="px-5 py-3.5 font-mono tracking-widest text-slate-700 dark:text-slate-300">
+                        {user.pin ?? <span className="font-sans tracking-normal text-slate-400">Not set</span>}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400">
+                        {formatDateTime(user.updated_at)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(user)}
+                          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                        >
+                          <Trash2 size={15} />
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {pendingDelete && (
         <Modal onClose={closeDeleteDialog}>

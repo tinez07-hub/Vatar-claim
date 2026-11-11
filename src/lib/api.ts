@@ -16,11 +16,6 @@ export interface AppUser {
   username: string;
   password: string;
   pin: string | null;
-  pending_amount: number | null;
-  verification_code: string | null;
-  verification_sent_at: string | null;
-  entered_code: string | null;
-  entered_code_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,11 +73,7 @@ export function loginUser(username: string, password: string) {
 }
 
 export function claimAmount(username: string, amount: number, pin: string) {
-  return callApi<{ verificationRequired: boolean }>({ action: 'claim', username, amount, pin });
-}
-
-export function verifyClaimCode(username: string, code: string) {
-  return callApi<{ amount: number; remaining: number }>({ action: 'verify-code', username, code });
+  return callApi<{ amount: number; remaining: number }>({ action: 'claim', username, amount, pin });
 }
 
 export function adminRequest<T>(password: string, adminAction: string, extra: Record<string, unknown> = {}) {
