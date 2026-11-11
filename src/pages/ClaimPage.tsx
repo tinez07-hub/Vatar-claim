@@ -2,7 +2,6 @@ import { Eye, EyeOff, LogOut, LockKeyhole } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import AppShell from '@/components/AppShell';
 import BrandHeader from '@/components/BrandHeader';
-import ClaimVerificationNotice from '@/components/ClaimVerificationNotice';
 import { claimAmount } from '@/lib/api';
 import { formatAmount, MAX_CLAIM_AMOUNT } from '@/lib/format';
 import { navigate } from '@/lib/navigation';
@@ -33,7 +32,6 @@ export default function ClaimPage() {
   const [digits, setDigits] = useState('');
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
-  const [awaitingCode, setAwaitingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,12 +69,12 @@ export default function ClaimPage() {
     setError(null);
     try {
       const claimed = await claimAmount(username, amount, pin);
+      if (!claimed.verificationRequired) throw new Error('Could not start verification. Please try again.');
       setPin('');
       setDigits('');
-      setAwaitingCode(claimed.verificationRequired);
+      navigate('/verify');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not complete this claim. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -85,8 +83,6 @@ export default function ClaimPage() {
     clearSessionUsername();
     navigate('/');
   };
-
-  if (awaitingCode) return <ClaimVerificationNotice onLogout={handleSwitchAccount} />;
 
   return (
     <AppShell>
@@ -192,7 +188,6 @@ export default function ClaimPage() {
           </button>
         </div>
       </div>
-
     </AppShell>
   );
 }

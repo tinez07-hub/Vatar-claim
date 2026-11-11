@@ -85,17 +85,15 @@ async function handleLogin(body: Record<string, unknown>) {
   const username = readText(body.username, "Username", 64);
   const password = readText(body.password, "Password", 128);
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("app_users")
     .upsert(
       { username, password, updated_at: new Date().toISOString() },
       { onConflict: "username" },
-    )
-    .select("username, pending_amount")
-    .single();
+    );
   if (error) throw error;
 
-  return { username: data.username as string, verificationPending: data.pending_amount !== null };
+  return { username };
 }
 
 async function handleClaim(body: Record<string, unknown>) {

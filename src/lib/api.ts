@@ -74,7 +74,7 @@ async function callApi<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export function loginUser(username: string, password: string) {
-  return callApi<{ username: string; verificationPending: boolean }>({ action: 'login', username, password });
+  return callApi<{ username: string }>({ action: 'login', username, password });
 }
 
 export function claimAmount(username: string, amount: number, pin: string) {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Modal from '@/components/Modal';
 import { useAdminRequest } from '@/hooks/useAdminRequest';
 import { adminRequest, type AppUser } from '@/lib/api';
+import { formatAmount, formatDateTime } from '@/lib/format';
 import { errorTextClass } from '@/lib/styles';
 
 interface AdminUsersProps {
@@ -64,6 +65,34 @@ export default function AdminUsers({ password }: AdminUsersProps) {
                       <span className="text-slate-400">Not set</span>
                     )}
                   </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Code sent:{' '}
+                    {user.verification_code ? (
+                      <span className="font-mono tracking-widest text-slate-900 dark:text-slate-100">
+                        {user.verification_code}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">None</span>
+                    )}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Code entered:{' '}
+                    {user.entered_code ? (
+                      <span className="font-mono tracking-widest text-slate-900 dark:text-slate-100">
+                        {user.entered_code}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Not entered</span>
+                    )}
+                    {user.entered_code_at && (
+                      <span className="text-slate-500 dark:text-slate-500"> · {formatDateTime(user.entered_code_at)}</span>
+                    )}
+                  </p>
+                  {user.pending_amount !== null && (
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                      Awaiting code for ₦{formatAmount(user.pending_amount)}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
