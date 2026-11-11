@@ -5,12 +5,9 @@ export function useAdminRequest<T>(password: string, adminAction: string) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     adminRequest<T>(password, adminAction)
       .then((result) => {
         if (!cancelled) setData(result);
@@ -24,13 +21,7 @@ export function useAdminRequest<T>(password: string, adminAction: string) {
     return () => {
       cancelled = true;
     };
-  }, [password, adminAction, reloadCount]);
+  }, [password, adminAction]);
 
-  return {
-    data,
-    setData,
-    loading,
-    error,
-    reload: () => setReloadCount((count) => count + 1),
-  };
+  return { data, setData, loading, error };
 }

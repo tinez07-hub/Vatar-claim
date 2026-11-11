@@ -1,65 +1,77 @@
-import { LayoutDashboard, LogOut, Users } from 'lucide-react';
+import { ArrowLeft, LayoutGrid, RefreshCw, Unlock, Users } from 'lucide-react';
 import { useState } from 'react';
-import ThemeToggle from '@/components/ThemeToggle';
+import AppShell from '@/components/AppShell';
+import BrandHeader from '@/components/BrandHeader';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import AdminGate from '@/components/admin/AdminGate';
 import AdminUsers from '@/components/admin/AdminUsers';
 import { navigate } from '@/lib/navigation';
+import { cardClass } from '@/lib/styles';
 
 type AdminSection = 'dashboard' | 'users';
 
 const SECTIONS: { id: AdminSection; label: string; icon: typeof Users }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'users', label: 'Saved users', icon: Users },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { id: 'users', label: 'User details', icon: Users },
 ];
+
+const iconButtonClass =
+  'flex h-11 w-11 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
 
 export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null);
   const [section, setSection] = useState<AdminSection>('dashboard');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   if (!password) return <AdminGate onUnlock={setPassword} />;
 
+  const handleLock = () => {
+    setPassword(null);
+    navigate('/');
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
+    <AppShell>
+      <BrandHeader subtitle="Live your Lagos story with real people." />
+
+      <div className={`mt-10 p-6 sm:p-8 ${cardClass}`}>
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-lg font-bold tracking-[0.3em] text-slate-900 dark:text-slate-50">VATAR</p>
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Admin console
-            </p>
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Admin</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Manage users and claims.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
+          <div className="flex items-center">
             <button
               type="button"
-              onClick={() => {
-                setPassword(null);
-                navigate('/');
-              }}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              onClick={() => setRefreshKey((count) => count + 1)}
+              aria-label="Refresh"
+              className={iconButtonClass}
             >
-              <LogOut size={16} />
-              Exit
+              <RefreshCw size={20} />
+            </button>
+            <button type="button" onClick={handleLock} aria-label="Lock admin" className={iconButtonClass}>
+              <Unlock size={20} />
             </button>
           </div>
         </div>
-      </header>
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 md:flex-row">
-        <nav className="flex gap-2 overflow-x-auto md:w-56 md:shrink-0 md:flex-col">
+        <div
+          role="tablist"
+          className="mt-8 grid grid-cols-2 gap-2 rounded-[1.5rem] border border-slate-200 bg-slate-100 p-1.5 dark:border-slate-700 dark:bg-slate-950/60"
+        >
           {SECTIONS.map(({ id, label, icon: Icon }) => {
             const active = section === id;
             return (
               <button
                 key={id}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => setSection(id)}
-                aria-current={active ? 'page' : undefined}
-                className={`inline-flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/40 ${
+                className={`flex items-center justify-center gap-2.5 rounded-2xl px-4 py-3.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/40 ${
                   active
-                    ? 'bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
                 }`}
               >
                 <Icon size={18} />
@@ -67,16 +79,21 @@ export default function AdminPage() {
               </button>
             );
           })}
-        </nav>
+        </div>
 
-        <main className="min-w-0 flex-1 animate-fade-in">
-          {section === 'dashboard' ? (
-            <AdminDashboard password={password} />
-          ) : (
-            <AdminUsers password={password} />
-          )}
-        </main>
+        <div key={`${section}-${refreshKey}`} className="mt-6 animate-fade-in">
+          {section === 'dashboard' ? <AdminDashboard password={password} /> : <AdminUsers password={password} />}
+        </div>
       </div>
-    </div>
+
+      <button
+        type="button"
+        onClick={() => navigate('/claim')}
+        className="mx-auto mt-8 flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+      >
+        <ArrowLeft size={16} />
+        Back to claim
+      </button>
+    </AppShell>
   );
 }
