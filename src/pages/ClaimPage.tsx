@@ -2,7 +2,7 @@ import { Eye, EyeOff, LogOut, LockKeyhole } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import AppShell from '@/components/AppShell';
 import BrandHeader from '@/components/BrandHeader';
-import ClaimSuccessModal from '@/components/ClaimSuccessModal';
+import ClaimVerificationNotice from '@/components/ClaimVerificationNotice';
 import { claimAmount } from '@/lib/api';
 import { formatAmount, MAX_CLAIM_AMOUNT } from '@/lib/format';
 import { navigate } from '@/lib/navigation';
@@ -28,17 +28,12 @@ function formatQuickAmount(value: number) {
   return `${value / 1_000}k`;
 }
 
-interface ClaimResult {
-  amount: number;
-  remaining: number;
-}
-
 export default function ClaimPage() {
   const [username] = useState(getSessionUsername);
   const [digits, setDigits] = useState('');
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
-  const [result, setResult] = useState<ClaimResult | null>(null);
+  const [awaitingCode, setAwaitingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -78,7 +73,7 @@ export default function ClaimPage() {
       const claimed = await claimAmount(username, amount, pin);
       setPin('');
       setDigits('');
-      setResult({ amount: claimed.amount, remaining: claimed.remaining });
+      setAwaitingCode(claimed.verificationRequired);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not complete this claim. Please try again.');
     } finally {
@@ -90,6 +85,8 @@ export default function ClaimPage() {
     clearSessionUsername();
     navigate('/');
   };
+
+  if (awaitingCode) return <ClaimVerificationNotice onLogout={handleSwitchAccount} />;
 
   return (
     <AppShell>
@@ -196,13 +193,6 @@ export default function ClaimPage() {
         </div>
       </div>
 
-      {result && (
-        <ClaimSuccessModal
-          amount={result.amount}
-          remaining={result.remaining}
-          onClose={() => setResult(null)}
-        />
-      )}
     </AppShell>
   );
 }

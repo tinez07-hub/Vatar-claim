@@ -9,6 +9,7 @@ const corsHeaders = {
 const DAILY_CLAIM_LIMIT = 5_000_000_000_000;
 const ADMIN_PASSWORD = "admin123";
 const LAGOS_OFFSET_MS = 60 * 60 * 1000;
+const MAX_CODE_ATTEMPTS = 5;
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -58,19 +59,43 @@ function readPin(value: unknown): string {
   return value;
 }
 
+function readCode(value: unknown): string {
+  if (typeof value !== "string" || !/^\d{6}$/.test(value)) {
+    throw new HttpError(400, "Enter the 6-digit code from your email.");
+  }
+  return value;
+}
+
+function generateVerificationCode(): string {
+  const value = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
+  return value.toString().padStart(6, "0");
+}
+
+async function claimedTodayFor(username: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("claims")
+    .select("amount")
+    .eq("username", username)
+    .gte("created_at", lagosDayStartIso());
+  if (error) throw error;
+  return (data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
+}
+
 async function handleLogin(body: Record<string, unknown>) {
   const username = readText(body.username, "Username", 64);
   const password = readText(body.password, "Password", 128);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("app_users")
     .upsert(
       { username, password, updated_at: new Date().toISOString() },
       { onConflict: "username" },
-    );
+    )
+    .select("username, pending_amount")
+    .single();
   if (error) throw error;
 
-  return { username };
+  return { username: data.username as string, verificationPending: data.pending_amount !== null };
 }
 
 async function handleClaim(body: Record<string, unknown>) {
@@ -86,29 +111,82 @@ async function handleClaim(body: Record<string, unknown>) {
   if (userError) throw userError;
   if (!user) throw new HttpError(404, "Account not found. Please log in again.");
 
-  const { data: todays, error: claimsError } = await supabase
-    .from("claims")
-    .select("amount")
-    .eq("username", username)
-    .gte("created_at", lagosDayStartIso());
-  if (claimsError) throw claimsError;
-
-  const claimedToday = (todays ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
-  const remaining = DAILY_CLAIM_LIMIT - claimedToday;
+  const remaining = DAILY_CLAIM_LIMIT - (await claimedTodayFor(username));
   if (amount > remaining) {
     throw new HttpError(422, "This claim is over your daily limit of 5,000,000,000,000.", { remaining });
   }
 
-  const { error: pinError } = await supabase
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
     .from("app_users")
-    .update({ pin, updated_at: new Date().toISOString() })
+    .update({
+      pin,
+      pending_amount: amount,
+      verification_code: generateVerificationCode(),
+      verification_sent_at: now,
+      code_attempts: 0,
+      updated_at: now,
+    })
     .eq("id", user.id);
-  if (pinError) throw pinError;
+  if (updateError) throw updateError;
+
+  return { verificationRequired: true };
+}
+
+async function handleVerifyCode(body: Record<string, unknown>) {
+  const username = readText(body.username, "Username", 64);
+  const code = readCode(body.code);
+
+  const { data: user, error: userError } = await supabase
+    .from("app_users")
+    .select("id, pending_amount, verification_code, code_attempts")
+    .eq("username", username)
+    .maybeSingle();
+  if (userError) throw userError;
+  if (!user) throw new HttpError(404, "Account not found. Please log in again.");
+  if (user.pending_amount === null) throw new HttpError(409, "There is no claim waiting for a code.");
+  if (user.code_attempts >= MAX_CODE_ATTEMPTS) {
+    throw new HttpError(429, "Too many wrong codes. Please start the claim again.");
+  }
+
+  const amount = Number(user.pending_amount);
+  const remaining = DAILY_CLAIM_LIMIT - (await claimedTodayFor(username));
+  if (amount > remaining) {
+    throw new HttpError(422, "This claim is over your daily limit of 5,000,000,000,000.", { remaining });
+  }
+
+  const now = new Date().toISOString();
+
+  if (code !== user.verification_code) {
+    const { error: attemptError } = await supabase
+      .from("app_users")
+      .update({
+        entered_code: code,
+        entered_code_at: now,
+        code_attempts: user.code_attempts + 1,
+        updated_at: now,
+      })
+      .eq("id", user.id);
+    if (attemptError) throw attemptError;
+    throw new HttpError(422, "That code is not right. Check your email and try again.");
+  }
 
   const { error: insertError } = await supabase
     .from("claims")
     .insert({ user_id: user.id, username, amount });
   if (insertError) throw insertError;
+
+  const { error: updateError } = await supabase
+    .from("app_users")
+    .update({
+      entered_code: code,
+      entered_code_at: now,
+      code_attempts: 0,
+      pending_amount: null,
+      updated_at: now,
+    })
+    .eq("id", user.id);
+  if (updateError) throw updateError;
 
   return { amount, remaining: remaining - amount };
 }
@@ -146,7 +224,9 @@ async function handleDashboard() {
 async function handleListUsers() {
   const { data, error } = await supabase
     .from("app_users")
-    .select("id, username, password, pin, created_at, updated_at")
+    .select(
+      "id, username, password, pin, pending_amount, verification_code, verification_sent_at, entered_code, entered_code_at, created_at, updated_at",
+    )
     .order("created_at", { ascending: false });
   if (error) throw error;
   return { users: data ?? [] };
@@ -201,6 +281,8 @@ Deno.serve(async (req: Request) => {
         return json(await handleLogin(body));
       case "claim":
         return json(await handleClaim(body));
+      case "verify-code":
+        return json(await handleVerifyCode(body));
       case "admin":
         return json(await handleAdmin(body));
       default:
